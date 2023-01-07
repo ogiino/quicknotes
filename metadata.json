@@ -1,0 +1,7 @@
+{
+    "name": "Quick Notes",
+    "description": "Quick access to notes from the top panel",
+    "uuid": "quicknotes@local",
+    "shell-version": ["42"],
+    "version": 1
+}

@@ -1,0 +1,59 @@
+.popup-menu-item-buttons {
+    spacing: 8px;
+}
+
+.popup-menu-item-buttons .button {
+    padding: 4px;
+    border-radius: 999px;
+    width: 24px;
+    height: 24px;
+}
+
+.popup-menu-item-buttons .button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.popup-menu-icon {
+    icon-size: 16px;
+}
+
+.note-dialog-content {
+    spacing: 20px;
+    padding: 16px;
+    width: 300px;
+}
+
+.note-dialog-entry {
+    width: 100%;
+    padding: 8px;
+}
+
+.search-box {
+    padding: 0;
+    margin: 0 -18px;
+}
+
+.search-entry {
+    min-height: 24px;
+    padding: 4px 12px;
+    border-radius: 0;
+    width: 100%;
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.search-entry:hover {
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.search-entry:focus {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+.search-entry-icon {
+    icon-size: 16px;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0 8px;
+}
