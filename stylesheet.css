@@ -1,5 +1,6 @@
 .popup-menu-item-buttons {
     spacing: 8px;
+    margin-left: auto;  /* This will push the buttons to the right */
 }
 
 .popup-menu-item-buttons .button {

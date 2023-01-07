@@ -120,13 +120,22 @@ class QuickNotesIndicator extends PanelMenu.Button {
                 let filename = info.get_name();
                 let title = this._getTitleFromFilename(filename);
                 
-                let noteItem = new PopupMenu.PopupMenuItem(title);
+                // Create menu item without label
+                let noteItem = new PopupMenu.PopupMenuItem('');
                 
                 // Add edit and delete buttons
                 let buttonBox = new St.BoxLayout({
-                    style_class: 'popup-menu-item-buttons',
-                    x_align: St.Align.END
+                    style_class: 'popup-menu-item-buttons'
                 });
+
+                // Create a container for the title and buttons
+                let itemBox = new St.BoxLayout({
+                    x_expand: true
+                });
+                
+                // Add the title
+                let titleLabel = new St.Label({ text: title });
+                itemBox.add_child(titleLabel);
 
                 let editIcon = new St.Icon({
                     icon_name: 'document-edit-symbolic',
@@ -156,7 +165,12 @@ class QuickNotesIndicator extends PanelMenu.Button {
 
                 buttonBox.add_child(editButton);
                 buttonBox.add_child(deleteButton);
-                noteItem.add_child(buttonBox);
+                
+                // Add buttons to the item box
+                itemBox.add_child(buttonBox);
+                
+                // Add the item box to the menu item
+                noteItem.add_child(itemBox);
                 
                 this._notesSection.addMenuItem(noteItem);
             }
