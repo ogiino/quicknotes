@@ -1,7 +1,9 @@
 {
     "name": "Quick Notes",
-    "description": "Quick access to notes from the top panel",
-    "uuid": "quicknotes@local",
+    "description": "A simple and efficient note-taking extension for GNOME Shell. Create, edit, and manage your notes directly from the top bar.",
+    "uuid": "quicknotes@dsabolo.github.io",
     "shell-version": ["42"],
-    "version": 1
+    "url": "https://github.com/dsabolo/quicknotes",
+    "version": 1,
+    "author": "Diego Sabolo"
 }
