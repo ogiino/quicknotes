@@ -177,13 +177,9 @@ class QuickNotesIndicator extends PanelMenu.Button {
 
                 buttonBox.add_child(editButton);
                 buttonBox.add_child(deleteButton);
-                
-                // Add buttons to the item box
                 itemBox.add_child(buttonBox);
                 
-                // Add the item box to the menu item
                 noteItem.add_child(itemBox);
-                
                 this._notesSection.addMenuItem(noteItem);
             }
         }
