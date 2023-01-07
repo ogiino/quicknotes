@@ -86,6 +86,31 @@ class QuickNotesIndicator extends PanelMenu.Button {
         // Separator
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
+        // Simple search entry
+        let searchItem = new PopupMenu.PopupBaseMenuItem({
+            reactive: false,
+            can_focus: false,
+            style_class: 'search-item'
+        });
+        
+        this._searchEntry = new St.Entry({
+            hint_text: 'Search notes...',
+            track_hover: true,
+            can_focus: true,
+            style_class: 'note-search-entry',
+            x_expand: true
+        });
+        
+        this._searchEntry.clutter_text.connect('text-changed', () => {
+            this._filterNotes();
+        });
+        
+        searchItem.add_child(this._searchEntry);
+        this.menu.addMenuItem(searchItem);
+
+        // Separator
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
         // Open Notes Folder
         let openFolderItem = new PopupMenu.PopupMenuItem('Open Notes Folder');
         openFolderItem.connect('activate', () => {
@@ -109,6 +134,7 @@ class QuickNotesIndicator extends PanelMenu.Button {
     _refreshNotes() {
         // Clear existing items
         this._notesSection.removeAll();
+        this._noteItems = [];  // Store note items for filtering
         
         let dir = Gio.File.new_for_path(this._notesDir);
         let enumerator = dir.enumerate_children('standard::*', Gio.FileQueryInfoFlags.NONE, null);
@@ -180,8 +206,20 @@ class QuickNotesIndicator extends PanelMenu.Button {
                 itemBox.add_child(buttonBox);
                 
                 noteItem.add_child(itemBox);
+                
+                // Store the item with its title for filtering
+                this._noteItems.push({
+                    item: noteItem,
+                    title: title.toLowerCase()
+                });
+                
                 this._notesSection.addMenuItem(noteItem);
             }
+        }
+        
+        // Apply current filter if search is active
+        if (this._searchEntry && this._searchEntry.get_text() !== '') {
+            this._filterNotes();
         }
     }
 
@@ -224,6 +262,17 @@ class QuickNotesIndicator extends PanelMenu.Button {
             this._refreshNotes();
         } catch (e) {
             log(`Error deleting note: ${e.message}`);
+        }
+    }
+
+    _filterNotes() {
+        if (!this._noteItems) return;
+        
+        let searchText = this._searchEntry.get_text().toLowerCase();
+        
+        for (let noteData of this._noteItems) {
+            let visible = searchText === '' || noteData.title.includes(searchText);
+            noteData.item.actor.visible = visible;
         }
     }
 });
