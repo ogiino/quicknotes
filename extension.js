@@ -9,8 +9,11 @@ const ModalDialog = imports.ui.modalDialog;
 
 let quickNotes;
 
+/**
+ * Dialog for creating a new note
+ */
 const NewNoteDialog = GObject.registerClass(
-class NewNoteDialog extends ModalDialog.ModalDialog {
+    class NewNoteDialog extends ModalDialog.ModalDialog {
     _init(callback) {
         super._init();
 
@@ -48,8 +51,12 @@ class NewNoteDialog extends ModalDialog.ModalDialog {
     }
 });
 
+    
+/**
+ * Main extension class that handles the panel indicator and note management
+ */
 const QuickNotesIndicator = GObject.registerClass(
-class QuickNotesIndicator extends PanelMenu.Button {
+    class QuickNotesIndicator extends PanelMenu.Button {
     _init() {
         super._init(0, "Quick Notes");
 
@@ -277,16 +284,26 @@ class QuickNotesIndicator extends PanelMenu.Button {
     }
 });
 
+/**
+ * Initialize the extension
+ * @returns {QuickNotesIndicator} The extension's main indicator instance
+ */
 function init() {
     log('initializing quick-notes extension');
 }
 
+/**
+ * Enable the extension
+ */
 function enable() {
     log('enabling quick-notes extension');
     quickNotes = new QuickNotesIndicator();
     Main.panel.addToStatusArea('quick-notes', quickNotes, 0, 'right');
 }
 
+/**
+ * Disable the extension and clean up resources
+ */
 function disable() {
     log('disabling quick-notes extension');
     if (quickNotes) {
