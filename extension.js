@@ -68,6 +68,11 @@ class QuickNotesIndicator extends PanelMenu.Button {
             dir.make_directory_with_parents(null);
         }
 
+        this._buildMenu();
+        this._refreshNotes();
+    }
+
+    _buildMenu() {
         // Add Note button
         let addNoteItem = new PopupMenu.PopupMenuItem('Add Note');
         addNoteItem.connect('activate', () => {
@@ -78,15 +83,90 @@ class QuickNotesIndicator extends PanelMenu.Button {
         });
         this.menu.addMenuItem(addNoteItem);
 
-        // Add separator
+        // Separator
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        // Add test item
-        let testItem = new PopupMenu.PopupMenuItem('Test Item');
-        testItem.connect('activate', () => {
-            log('Test item clicked');
+        // Open Notes Folder
+        let openFolderItem = new PopupMenu.PopupMenuItem('Open Notes Folder');
+        openFolderItem.connect('activate', () => {
+            let uri = `file://${this._notesDir}`;
+            try {
+                Gio.AppInfo.launch_default_for_uri(uri, null);
+            } catch (e) {
+                log(`Error opening folder: ${e.message}`);
+            }
         });
-        this.menu.addMenuItem(testItem);
+        this.menu.addMenuItem(openFolderItem);
+
+        // Separator
+        this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        // Notes section
+        this._notesSection = new PopupMenu.PopupMenuSection();
+        this.menu.addMenuItem(this._notesSection);
+    }
+
+    _refreshNotes() {
+        // Clear existing items
+        this._notesSection.removeAll();
+        
+        let dir = Gio.File.new_for_path(this._notesDir);
+        let enumerator = dir.enumerate_children('standard::*', Gio.FileQueryInfoFlags.NONE, null);
+        
+        let info;
+        while ((info = enumerator.next_file(null))) {
+            if (info.get_file_type() === Gio.FileType.REGULAR && 
+                info.get_name().endsWith('.md')) {
+                let filename = info.get_name();
+                let title = this._getTitleFromFilename(filename);
+                
+                let noteItem = new PopupMenu.PopupMenuItem(title);
+                
+                // Add edit and delete buttons
+                let buttonBox = new St.BoxLayout({
+                    style_class: 'popup-menu-item-buttons',
+                    x_align: St.Align.END
+                });
+
+                let editIcon = new St.Icon({
+                    icon_name: 'document-edit-symbolic',
+                    style_class: 'popup-menu-icon'
+                });
+                let editButton = new St.Button({
+                    style_class: 'button',
+                    child: editIcon
+                });
+                editButton.connect('clicked', () => {
+                    this._editNote(filename);
+                    this.menu.close();
+                });
+
+                let deleteIcon = new St.Icon({
+                    icon_name: 'edit-delete-symbolic',
+                    style_class: 'popup-menu-icon'
+                });
+                let deleteButton = new St.Button({
+                    style_class: 'button',
+                    child: deleteIcon
+                });
+                deleteButton.connect('clicked', () => {
+                    this._deleteNote(filename);
+                    this.menu.close();
+                });
+
+                buttonBox.add_child(editButton);
+                buttonBox.add_child(deleteButton);
+                noteItem.add_child(buttonBox);
+                
+                this._notesSection.addMenuItem(noteItem);
+            }
+        }
+    }
+
+    _getTitleFromFilename(filename) {
+        // Remove .md extension
+        let title = filename.slice(0, -3);
+        return decodeURIComponent(title);
     }
 
     _createNewNote(title) {
@@ -99,6 +179,7 @@ class QuickNotesIndicator extends PanelMenu.Button {
             stream.write_all(`# ${title}\n\n`, null);
             stream.close(null);
             this._editNote(`${safeTitle}.md`);
+            this._refreshNotes();
         } catch (e) {
             log(`Error creating note: ${e.message}`);
         }
@@ -111,6 +192,16 @@ class QuickNotesIndicator extends PanelMenu.Button {
             Gio.AppInfo.launch_default_for_uri(uri, null);
         } catch (e) {
             log(`Error opening note: ${e.message}`);
+        }
+    }
+
+    _deleteNote(filename) {
+        let file = Gio.File.new_for_path(GLib.build_filenamev([this._notesDir, filename]));
+        try {
+            file.delete(null);
+            this._refreshNotes();
+        } catch (e) {
+            log(`Error deleting note: ${e.message}`);
         }
     }
 });
