@@ -123,19 +123,31 @@ class QuickNotesIndicator extends PanelMenu.Button {
                 // Create menu item without label
                 let noteItem = new PopupMenu.PopupMenuItem('');
                 
-                // Add edit and delete buttons
-                let buttonBox = new St.BoxLayout({
-                    style_class: 'popup-menu-item-buttons'
-                });
-
                 // Create a container for the title and buttons
                 let itemBox = new St.BoxLayout({
-                    x_expand: true
+                    x_expand: true,
+                    style_class: 'note-item-box'
                 });
                 
                 // Add the title
-                let titleLabel = new St.Label({ text: title });
+                let titleLabel = new St.Label({ 
+                    text: title,
+                    y_align: St.Align.MIDDLE
+                });
                 itemBox.add_child(titleLabel);
+
+                // Add a expanding spacer
+                let spacer = new St.Widget({
+                    style_class: 'note-item-spacer',
+                    x_expand: true
+                });
+                itemBox.add_child(spacer);
+
+                // Add edit and delete buttons
+                let buttonBox = new St.BoxLayout({
+                    style_class: 'popup-menu-item-buttons',
+                    x_align: St.Align.END
+                });
 
                 let editIcon = new St.Icon({
                     icon_name: 'document-edit-symbolic',

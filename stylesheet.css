@@ -1,6 +1,5 @@
 .popup-menu-item-buttons {
     spacing: 8px;
-    margin-left: auto;  /* This will push the buttons to the right */
 }
 
 .popup-menu-item-buttons .button {
@@ -16,6 +15,14 @@
 
 .popup-menu-icon {
     icon-size: 16px;
+}
+
+.note-item-box {
+    spacing: 8px;
+}
+
+.note-item-spacer {
+    min-width: 1px;  /* Needed for the spacer to work properly */
 }
 
 .note-dialog-content {
