@@ -159,13 +159,6 @@ const QuickNotesIndicator = GObject.registerClass(
     }
 
     _buildMenu() {
-      // Create a horizontal box for Add Note and Add Category
-      let topButtonBox = new St.BoxLayout({
-        style_class: "top-button-row",
-        vertical: false,
-        x_expand: true,
-      });
-
       // Add Note button with icon
       let addNoteItem = new St.Button({
         style_class: "add-note-button",
@@ -188,7 +181,13 @@ const QuickNotesIndicator = GObject.registerClass(
         }, this._getCategoryList());
         dialog.open();
       });
-      topButtonBox.add_child(addNoteItem);
+
+      let addNoteMenuItem = new PopupMenu.PopupBaseMenuItem({
+        reactive: true,
+        can_focus: false,
+      });
+      addNoteMenuItem.add_child(addNoteItem);
+      this.menu.addMenuItem(addNoteMenuItem);
 
       // Add Category button
       let addCategoryItem = new St.Button({
@@ -212,15 +211,13 @@ const QuickNotesIndicator = GObject.registerClass(
         });
         dialog.open();
       });
-      topButtonBox.add_child(addCategoryItem);
 
-      let topButtonMenuItem = new PopupMenu.PopupBaseMenuItem({
+      let addCategoryMenuItem = new PopupMenu.PopupBaseMenuItem({
         reactive: true,
         can_focus: false,
-        style_class: "top-button-row-menu-item",
       });
-      topButtonMenuItem.add_child(topButtonBox);
-      this.menu.addMenuItem(topButtonMenuItem);
+      addCategoryMenuItem.add_child(addCategoryItem);
+      this.menu.addMenuItem(addCategoryMenuItem);
 
       // Separator
       this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
