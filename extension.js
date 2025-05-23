@@ -215,7 +215,7 @@ const QuickNotesIndicator = GObject.registerClass(
       topButtonBox.add_child(addCategoryItem);
 
       let topButtonMenuItem = new PopupMenu.PopupBaseMenuItem({
-        reactive: false,
+        reactive: true,
         can_focus: false,
         style_class: "top-button-row-menu-item",
       });
