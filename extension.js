@@ -29,10 +29,10 @@ const NewNoteDialog = GObject.registerClass(
       });
       content.add_child(entry);
 
-      // Category selection
+      // Category selection as radio buttons
       let categoryBox = new St.BoxLayout({
         style_class: "note-dialog-category-box",
-        vertical: false,
+        vertical: true,
       });
       let categoryLabel = new St.Label({
         text: "Category:",
@@ -40,39 +40,27 @@ const NewNoteDialog = GObject.registerClass(
       });
       categoryBox.add_child(categoryLabel);
 
-      // Create a button that will show the category menu
-      this._categoryButton = new St.Button({
-        label: "Select Category",
-        style_class: "category-button",
-      });
+      this._selectedCategory = null;
+      this._categoryButtons = [];
 
-      // Create the category menu
-      this._categoryMenu = new PopupMenu.PopupMenu(
-        this._categoryButton,
-        0.5,
-        St.Side.TOP
-      );
-      this._categoryMenu.box.style_class = "category-menu";
-      Main.uiGroup.add_actor(this._categoryMenu.actor);
-      this._categoryMenu.actor.hide();
-
-      // Add categories to the menu
       for (let cat of categories) {
-        let item = new PopupMenu.PopupMenuItem(cat.displayName);
-        item.connect("activate", () => {
-          this._selectedCategory = cat.name;
-          this._categoryButton.label = cat.displayName;
-          this._categoryMenu.close();
+        let catButton = new St.Button({
+          style_class: "category-radio-button",
+          can_focus: true,
         });
-        this._categoryMenu.addMenuItem(item);
+        let catLabel = new St.Label({ text: cat.displayName });
+        catButton.add_child(catLabel);
+        catButton.connect("clicked", () => {
+          this._selectedCategory = cat.name;
+          // Update visual selection
+          for (let btn of this._categoryButtons) {
+            btn.remove_style_class_name("selected-category-radio");
+          }
+          catButton.add_style_class_name("selected-category-radio");
+        });
+        this._categoryButtons.push(catButton);
+        categoryBox.add_child(catButton);
       }
-
-      // Connect the button to show the menu
-      this._categoryButton.connect("clicked", () => {
-        this._categoryMenu.toggle();
-      });
-
-      categoryBox.add_child(this._categoryButton);
       content.add_child(categoryBox);
 
       this.contentLayout.add_child(content);
@@ -80,7 +68,6 @@ const NewNoteDialog = GObject.registerClass(
       this.addButton({
         label: "Cancel",
         action: () => {
-          this._categoryMenu.close();
           this.close();
         },
       });
@@ -91,15 +78,9 @@ const NewNoteDialog = GObject.registerClass(
           let title = entry.get_text().trim();
           if (title && this._selectedCategory) {
             callback(title, this._selectedCategory);
-            this._categoryMenu.close();
             this.close();
           }
         },
-      });
-
-      // Clean up when dialog is closed
-      this.connect("closed", () => {
-        this._categoryMenu.close();
       });
     }
   }
