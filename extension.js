@@ -160,64 +160,34 @@ const QuickNotesIndicator = GObject.registerClass(
 
     _buildMenu() {
       // Add Note button with icon
-      let addNoteItem = new St.Button({
-        style_class: "add-note-button",
-        x_expand: true,
-      });
+      let addNoteItem = new PopupMenu.PopupMenuItem("Add Note");
       let addIcon = new St.Icon({
         icon_name: "document-new-symbolic",
         style_class: "popup-menu-icon",
       });
-      let addNoteLabel = new St.Label({ text: "Add Note" });
-      let addNoteBox = new St.BoxLayout();
-      addNoteBox.add_child(addIcon);
-      let addNoteSpacer = new St.Widget({ width: 6 });
-      addNoteBox.add_child(addNoteSpacer);
-      addNoteBox.add_child(addNoteLabel);
-      addNoteItem.set_child(addNoteBox);
-      addNoteItem.connect("clicked", () => {
+      addNoteItem.insert_child_at_index(addIcon, 1);
+      addNoteItem.connect("activate", () => {
         let dialog = new NewNoteDialog((title, category) => {
           this._createNewNote(title, category);
         }, this._getCategoryList());
         dialog.open();
       });
-
-      let addNoteMenuItem = new PopupMenu.PopupBaseMenuItem({
-        reactive: true,
-        can_focus: false,
-      });
-      addNoteMenuItem.add_child(addNoteItem);
-      this.menu.addMenuItem(addNoteMenuItem);
+      this.menu.addMenuItem(addNoteItem);
 
       // Add Category button
-      let addCategoryItem = new St.Button({
-        style_class: "add-category-button",
-        x_expand: true,
-      });
+      let addCategoryItem = new PopupMenu.PopupMenuItem("Add Category");
       let addCategoryIcon = new St.Icon({
         icon_name: "folder-new-symbolic",
         style_class: "popup-menu-icon",
       });
-      let addCategoryLabel = new St.Label({ text: "Add Category" });
-      let addCategoryBox = new St.BoxLayout();
-      addCategoryBox.add_child(addCategoryIcon);
-      let addCategorySpacer = new St.Widget({ width: 6 });
-      addCategoryBox.add_child(addCategorySpacer);
-      addCategoryBox.add_child(addCategoryLabel);
-      addCategoryItem.set_child(addCategoryBox);
-      addCategoryItem.connect("clicked", () => {
+      addCategoryItem.insert_child_at_index(addCategoryIcon, 1);
+      addCategoryItem.connect("activate", () => {
         let dialog = new NewFolderDialog((name) => {
           this._createNewCategory(name);
         });
         dialog.open();
       });
-
-      let addCategoryMenuItem = new PopupMenu.PopupBaseMenuItem({
-        reactive: true,
-        can_focus: false,
-      });
-      addCategoryMenuItem.add_child(addCategoryItem);
-      this.menu.addMenuItem(addCategoryMenuItem);
+      this.menu.addMenuItem(addCategoryItem);
 
       // Separator
       this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
