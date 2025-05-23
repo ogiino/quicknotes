@@ -111,6 +111,9 @@ const QuickNotesIndicator = GObject.registerClass(
       hbox.add_child(icon);
       this.add_child(hbox);
 
+      // Initialize selected category
+      this._selectedCategory = "all";
+
       // Create notes directory
       this._notesDir = GLib.build_filenamev([
         GLib.get_home_dir(),
