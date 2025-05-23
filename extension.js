@@ -14,7 +14,7 @@ let quickNotes;
  */
 const NewNoteDialog = GObject.registerClass(
   class NewNoteDialog extends ModalDialog.ModalDialog {
-    _init(callback, categories) {
+    _init(callback) {
       super._init();
 
       let content = new St.BoxLayout({
@@ -29,40 +29,6 @@ const NewNoteDialog = GObject.registerClass(
       });
       content.add_child(entry);
 
-      // Category selection as radio buttons
-      let categoryBox = new St.BoxLayout({
-        style_class: "note-dialog-category-box",
-        vertical: true,
-      });
-      let categoryLabel = new St.Label({
-        text: "Category:",
-        x_align: St.Align.START,
-      });
-      categoryBox.add_child(categoryLabel);
-
-      this._selectedCategory = null;
-      this._categoryButtons = [];
-
-      for (let cat of categories) {
-        let catButton = new St.Button({
-          style_class: "category-radio-button",
-          can_focus: true,
-        });
-        let catLabel = new St.Label({ text: cat.displayName });
-        catButton.add_child(catLabel);
-        catButton.connect("clicked", () => {
-          this._selectedCategory = cat.name;
-          // Update visual selection
-          for (let btn of this._categoryButtons) {
-            btn.remove_style_class_name("selected-category-radio");
-          }
-          catButton.add_style_class_name("selected-category-radio");
-        });
-        this._categoryButtons.push(catButton);
-        categoryBox.add_child(catButton);
-      }
-      content.add_child(categoryBox);
-
       this.contentLayout.add_child(content);
 
       this.addButton({
@@ -76,8 +42,8 @@ const NewNoteDialog = GObject.registerClass(
         label: "Create",
         action: () => {
           let title = entry.get_text().trim();
-          if (title && this._selectedCategory) {
-            callback(title, this._selectedCategory);
+          if (title) {
+            callback(title);
             this.close();
           }
         },
@@ -182,9 +148,9 @@ const QuickNotesIndicator = GObject.registerClass(
       });
       addNoteItem.insert_child_at_index(addIcon, 1);
       addNoteItem.connect("activate", () => {
-        let dialog = new NewNoteDialog((title, category) => {
-          this._createNewNote(title, category);
-        }, this._getCategoryList());
+        let dialog = new NewNoteDialog((title) => {
+          this._createNewNote(title);
+        });
         dialog.open();
       });
       this.menu.addMenuItem(addNoteItem);
@@ -359,19 +325,15 @@ const QuickNotesIndicator = GObject.registerClass(
       }
     }
 
-    _createNewNote(title, category) {
+    _createNewNote(title) {
       let safeTitle = title.replace(/ /g, "_");
-      let categoryPath = category
-        ? GLib.build_filenamev([this._categoriesDir, category])
-        : this._notesDir;
-      let notePath = GLib.build_filenamev([categoryPath, `${safeTitle}.md`]);
+      let notePath = GLib.build_filenamev([this._notesDir, `${safeTitle}.md`]);
       let file = Gio.File.new_for_path(notePath);
-
       try {
         let stream = file.create(Gio.FileCreateFlags.NONE, null);
         stream.write_all(`# ${title}\n\n`, null);
         stream.close(null);
-        this._editNote(`${safeTitle}.md`, categoryPath);
+        this._editNote(`${safeTitle}.md`, this._notesDir);
         this._refreshNotes();
       } catch (e) {
         log(`Error creating note: ${e.message}`);
