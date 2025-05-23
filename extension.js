@@ -29,22 +29,48 @@ const NewNoteDialog = GObject.registerClass(
       });
       content.add_child(entry);
 
-      // Category dropdown
+      // Category selection
       let categoryBox = new St.BoxLayout({
         style_class: "note-dialog-category-box",
         vertical: false,
-        spacing: 8,
       });
       let categoryLabel = new St.Label({
         text: "Category:",
         x_align: St.Align.START,
       });
       categoryBox.add_child(categoryLabel);
-      let categoryDropdown = new St.ComboBoxText();
+
+      // Create a button that will show the category menu
+      this._categoryButton = new St.Button({
+        label: "Select Category",
+        style_class: "category-button",
+      });
+
+      // Create the category menu
+      this._categoryMenu = new PopupMenu.PopupMenu(
+        this._categoryButton,
+        0.5,
+        St.Side.TOP
+      );
+      this._categoryMenu.box.style_class = "category-menu";
+
+      // Add categories to the menu
       for (let cat of categories) {
-        categoryDropdown.append(cat.name, cat.displayName);
+        let item = new PopupMenu.PopupMenuItem(cat.displayName);
+        item.connect("activate", () => {
+          this._selectedCategory = cat.name;
+          this._categoryButton.label = cat.displayName;
+          this._categoryMenu.close();
+        });
+        this._categoryMenu.addMenuItem(item);
       }
-      categoryBox.add_child(categoryDropdown);
+
+      // Connect the button to show the menu
+      this._categoryButton.connect("clicked", () => {
+        this._categoryMenu.toggle();
+      });
+
+      categoryBox.add_child(this._categoryButton);
       content.add_child(categoryBox);
 
       this.contentLayout.add_child(content);
@@ -60,9 +86,8 @@ const NewNoteDialog = GObject.registerClass(
         label: "Create",
         action: () => {
           let title = entry.get_text().trim();
-          let category = categoryDropdown.get_active_id();
-          if (title && category) {
-            callback(title, category);
+          if (title && this._selectedCategory) {
+            callback(title, this._selectedCategory);
             this.close();
           }
         },
