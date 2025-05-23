@@ -15,6 +15,7 @@
 
 .popup-menu-icon {
     icon-size: 16px;
+    color: inherit;
 }
 
 .note-item-box {
@@ -54,4 +55,17 @@
 .note-dialog-entry {
     width: 100%;
     padding: 8px;
+}
+
+.search-box {
+    spacing: 6px;
+    padding: 0 8px;
+}
+
+.search-item {
+    padding: 4px 0;
+}
+
+.search-entry {
+    width: 200px;
 }

@@ -2,6 +2,16 @@
 
 A simple and efficient note-taking extension for GNOME Shell that allows you to create, edit, and manage your notes directly from the top bar.
 
+## Features
+
+- 📝 Create new notes with custom titles
+- 🔍 Search through your notes in real-time
+- ✏️ Edit notes in your default text editor
+- 🗑️ Delete notes with a single click
+- 📁 Open notes folder directly
+- 📋 Markdown format support
+- 🎯 Clean and intuitive interface
+
 ## Installation
 
 ### From extensions.gnome.org
