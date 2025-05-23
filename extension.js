@@ -135,6 +135,7 @@ const QuickNotesIndicator = GObject.registerClass(
       }
 
       this._buildMenu();
+      this._refreshCategories();
       this._refreshNotes();
     }
 
@@ -190,7 +191,6 @@ const QuickNotesIndicator = GObject.registerClass(
       });
       categoryBox.add_child(categoryIcon);
 
-      // Replace ComboBox with custom dropdown
       this._categoryButton = new St.Button({
         label: "All Categories",
         style_class: "category-button",
@@ -274,21 +274,6 @@ const QuickNotesIndicator = GObject.registerClass(
       this.menu.addMenuItem(this._notesSection);
     }
 
-    _createNewCategory(name) {
-      let safeName = name.replace(/ /g, "_");
-      let categoryPath = GLib.build_filenamev([this._categoriesDir, safeName]);
-      let dir = Gio.File.new_for_path(categoryPath);
-
-      try {
-        if (!dir.query_exists(null)) {
-          dir.make_directory_with_parents(null);
-          this._refreshCategories();
-        }
-      } catch (e) {
-        log(`Error creating category: ${e.message}`);
-      }
-    }
-
     _refreshCategories() {
       // Clear existing items
       this._categorySubMenu.menu.removeAll();
@@ -325,6 +310,21 @@ const QuickNotesIndicator = GObject.registerClass(
       }
     }
 
+    _createNewCategory(name) {
+      let safeName = name.replace(/ /g, "_");
+      let categoryPath = GLib.build_filenamev([this._categoriesDir, safeName]);
+      let dir = Gio.File.new_for_path(categoryPath);
+
+      try {
+        if (!dir.query_exists(null)) {
+          dir.make_directory_with_parents(null);
+          this._refreshCategories();
+        }
+      } catch (e) {
+        log(`Error creating category: ${e.message}`);
+      }
+    }
+
     _createNewNote(title) {
       let safeTitle = title.replace(/ /g, "_");
       let categoryPath =
@@ -348,6 +348,14 @@ const QuickNotesIndicator = GObject.registerClass(
 
     _filterByCategory() {
       this._refreshNotes();
+    }
+
+    _filterNotes() {
+      let searchText = this._searchEntry.get_text().toLowerCase();
+
+      for (let noteItem of this._noteItems) {
+        noteItem.item.visible = noteItem.filename.includes(searchText);
+      }
     }
 
     _refreshNotes() {
@@ -382,6 +390,11 @@ const QuickNotesIndicator = GObject.registerClass(
             baseDir
           );
         }
+      }
+
+      // Apply current search filter if any
+      if (this._searchEntry.get_text()) {
+        this._filterNotes();
       }
     }
 
