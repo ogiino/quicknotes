@@ -53,6 +53,8 @@ const NewNoteDialog = GObject.registerClass(
         St.Side.TOP
       );
       this._categoryMenu.box.style_class = "category-menu";
+      Main.uiGroup.add_actor(this._categoryMenu.actor);
+      this._categoryMenu.actor.hide();
 
       // Add categories to the menu
       for (let cat of categories) {
@@ -78,6 +80,7 @@ const NewNoteDialog = GObject.registerClass(
       this.addButton({
         label: "Cancel",
         action: () => {
+          this._categoryMenu.close();
           this.close();
         },
       });
@@ -88,9 +91,15 @@ const NewNoteDialog = GObject.registerClass(
           let title = entry.get_text().trim();
           if (title && this._selectedCategory) {
             callback(title, this._selectedCategory);
+            this._categoryMenu.close();
             this.close();
           }
         },
+      });
+
+      // Clean up when dialog is closed
+      this.connect("closed", () => {
+        this._categoryMenu.close();
       });
     }
   }
