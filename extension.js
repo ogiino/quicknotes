@@ -176,9 +176,10 @@ const QuickNotesIndicator = GObject.registerClass(
         style_class: "popup-menu-icon",
       });
       let addNoteLabel = new St.Label({ text: "Add Note" });
-      addNoteItem.set_child(
-        new St.BoxLayout({ children: [addIcon, addNoteLabel], spacing: 6 })
-      );
+      let addNoteBox = new St.BoxLayout({ spacing: 6 });
+      addNoteBox.add_child(addIcon);
+      addNoteBox.add_child(addNoteLabel);
+      addNoteItem.set_child(addNoteBox);
       addNoteItem.connect("clicked", () => {
         let dialog = new NewNoteDialog((title, category) => {
           this._createNewNote(title, category);
@@ -197,12 +198,10 @@ const QuickNotesIndicator = GObject.registerClass(
         style_class: "popup-menu-icon",
       });
       let addCategoryLabel = new St.Label({ text: "Add Category" });
-      addCategoryItem.set_child(
-        new St.BoxLayout({
-          children: [addCategoryIcon, addCategoryLabel],
-          spacing: 6,
-        })
-      );
+      let addCategoryBox = new St.BoxLayout({ spacing: 6 });
+      addCategoryBox.add_child(addCategoryIcon);
+      addCategoryBox.add_child(addCategoryLabel);
+      addCategoryItem.set_child(addCategoryBox);
       addCategoryItem.connect("clicked", () => {
         let dialog = new NewFolderDialog((name) => {
           this._createNewCategory(name);
