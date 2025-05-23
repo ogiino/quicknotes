@@ -187,17 +187,27 @@ const QuickNotesIndicator = GObject.registerClass(
       });
       categoryBox.add_child(categoryIcon);
 
-      this._categoryCombo = new St.ComboBox({
+      // Replace ComboBox with custom dropdown
+      this._categoryButton = new St.Button({
+        label: "All Categories",
+        style_class: "category-button",
         x_expand: true,
-        style_class: "category-combo",
-      });
-      this._categoryCombo.connect("changed", () => {
-        this._filterByCategory();
       });
 
-      categoryBox.add_child(this._categoryCombo);
+      this._categorySubMenu = new PopupMenu.PopupSubMenuMenuItem("", false);
+      this._categorySubMenu.actor.hide();
+      this._categorySubMenu.connect("activate", () => {
+        this._categorySubMenu.menu.toggle();
+      });
+
+      this._categoryButton.connect("clicked", () => {
+        this._categorySubMenu.menu.toggle();
+      });
+
+      categoryBox.add_child(this._categoryButton);
       categoryFilterItem.add_child(categoryBox);
       this.menu.addMenuItem(categoryFilterItem);
+      this.menu.addMenuItem(this._categorySubMenu);
 
       // Search entry with icon
       let searchItem = new PopupMenu.PopupBaseMenuItem({
@@ -277,10 +287,17 @@ const QuickNotesIndicator = GObject.registerClass(
     }
 
     _refreshCategories() {
-      this._categoryCombo.remove_all();
+      // Clear existing items
+      this._categorySubMenu.menu.removeAll();
 
       // Add "All Categories" option
-      this._categoryCombo.add("All Categories", "all");
+      let allCategoriesItem = new PopupMenu.PopupMenuItem("All Categories");
+      allCategoriesItem.connect("activate", () => {
+        this._categoryButton.label = "All Categories";
+        this._selectedCategory = "all";
+        this._filterByCategory();
+      });
+      this._categorySubMenu.menu.addMenuItem(allCategoriesItem);
 
       let dir = Gio.File.new_for_path(this._categoriesDir);
       let enumerator = dir.enumerate_children(
@@ -294,20 +311,23 @@ const QuickNotesIndicator = GObject.registerClass(
         if (info.get_file_type() === Gio.FileType.DIRECTORY) {
           let name = info.get_name();
           let displayName = name.replace(/_/g, " ");
-          this._categoryCombo.add(displayName, name);
+          let categoryItem = new PopupMenu.PopupMenuItem(displayName);
+          categoryItem.connect("activate", () => {
+            this._categoryButton.label = displayName;
+            this._selectedCategory = name;
+            this._filterByCategory();
+          });
+          this._categorySubMenu.menu.addMenuItem(categoryItem);
         }
       }
-
-      this._categoryCombo.set_selected(0);
     }
 
     _createNewNote(title) {
       let safeTitle = title.replace(/ /g, "_");
-      let selectedCategory = this._categoryCombo.get_selected();
       let categoryPath =
-        selectedCategory === "all"
+        this._selectedCategory === "all"
           ? this._notesDir
-          : GLib.build_filenamev([this._categoriesDir, selectedCategory]);
+          : GLib.build_filenamev([this._categoriesDir, this._selectedCategory]);
 
       let notePath = GLib.build_filenamev([categoryPath, `${safeTitle}.md`]);
       let file = Gio.File.new_for_path(notePath);
@@ -324,7 +344,6 @@ const QuickNotesIndicator = GObject.registerClass(
     }
 
     _filterByCategory() {
-      let selectedCategory = this._categoryCombo.get_selected();
       this._refreshNotes();
     }
 
@@ -333,11 +352,10 @@ const QuickNotesIndicator = GObject.registerClass(
       this._notesSection.removeAll();
       this._noteItems = [];
 
-      let selectedCategory = this._categoryCombo.get_selected();
       let baseDir =
-        selectedCategory === "all"
+        this._selectedCategory === "all"
           ? this._notesDir
-          : GLib.build_filenamev([this._categoriesDir, selectedCategory]);
+          : GLib.build_filenamev([this._categoriesDir, this._selectedCategory]);
 
       let dir = Gio.File.new_for_path(baseDir);
       let enumerator = dir.enumerate_children(
