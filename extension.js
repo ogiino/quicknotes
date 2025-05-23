@@ -479,20 +479,6 @@ const QuickNotesIndicator = GObject.registerClass(
       });
       buttonBox.add_child(editButton);
 
-      // Move button
-      let moveIcon = new St.Icon({
-        icon_name: "go-jump-symbolic",
-        style_class: "popup-menu-icon",
-      });
-      let moveButton = new St.Button({
-        style_class: "button",
-        child: moveIcon,
-      });
-      moveButton.connect("clicked", () => {
-        this._showMoveNoteMenu(filename, parentPath, noteItem);
-      });
-      buttonBox.add_child(moveButton);
-
       // Delete button
       let deleteIcon = new St.Icon({
         icon_name: "edit-delete-symbolic",
@@ -517,48 +503,6 @@ const QuickNotesIndicator = GObject.registerClass(
       });
 
       menu.addMenuItem(noteItem);
-    }
-
-    _showMoveNoteMenu(filename, parentPath, noteItem) {
-      // Crée un menu contextuel pour choisir la destination
-      let moveMenu = new PopupMenu.PopupSubMenuMenuItem("Déplacer vers...");
-      let categories = this._getCategoryList();
-      // Option Sans catégorie
-      let rootItem = new PopupMenu.PopupMenuItem("Sans catégorie");
-      rootItem.connect("activate", () => {
-        this._moveNoteToCategory(filename, parentPath, null);
-        moveMenu.destroy();
-      });
-      moveMenu.menu.addMenuItem(rootItem);
-      for (let cat of categories) {
-        let catItem = new PopupMenu.PopupMenuItem(cat.displayName);
-        catItem.connect("activate", () => {
-          this._moveNoteToCategory(filename, parentPath, cat.name);
-          moveMenu.destroy();
-        });
-        moveMenu.menu.addMenuItem(catItem);
-      }
-      // Affiche le menu juste après le noteItem
-      let parentMenu = noteItem._parent;
-      let idx = parentMenu._getMenuItems().indexOf(noteItem);
-      parentMenu.addMenuItem(moveMenu, idx + 1);
-      moveMenu.menu.open();
-    }
-
-    _moveNoteToCategory(filename, oldParentPath, newCategory) {
-      let oldPath = GLib.build_filenamev([oldParentPath, filename]);
-      let newParentPath = newCategory
-        ? GLib.build_filenamev([this._categoriesDir, newCategory])
-        : this._notesDir;
-      let newPath = GLib.build_filenamev([newParentPath, filename]);
-      let oldFile = Gio.File.new_for_path(oldPath);
-      let newFile = Gio.File.new_for_path(newPath);
-      try {
-        oldFile.move(newFile, Gio.FileCopyFlags.OVERWRITE, null, null);
-        this._refreshNotes();
-      } catch (e) {
-        log(`Error moving note: ${e.message}`);
-      }
     }
 
     _editNote(filename, parentPath) {
