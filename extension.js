@@ -14,7 +14,7 @@ let quickNotes;
  */
 const NewNoteDialog = GObject.registerClass(
   class NewNoteDialog extends ModalDialog.ModalDialog {
-    _init(callback) {
+    _init(callback, categories) {
       super._init();
 
       let content = new St.BoxLayout({
@@ -29,6 +29,24 @@ const NewNoteDialog = GObject.registerClass(
       });
       content.add_child(entry);
 
+      // Category dropdown
+      let categoryBox = new St.BoxLayout({
+        style_class: "note-dialog-category-box",
+        vertical: false,
+        spacing: 8,
+      });
+      let categoryLabel = new St.Label({
+        text: "Category:",
+        x_align: St.Align.START,
+      });
+      categoryBox.add_child(categoryLabel);
+      let categoryDropdown = new St.ComboBoxText();
+      for (let cat of categories) {
+        categoryDropdown.append(cat.name, cat.displayName);
+      }
+      categoryBox.add_child(categoryDropdown);
+      content.add_child(categoryBox);
+
       this.contentLayout.add_child(content);
 
       this.addButton({
@@ -42,10 +60,11 @@ const NewNoteDialog = GObject.registerClass(
         label: "Create",
         action: () => {
           let title = entry.get_text().trim();
-          if (title) {
-            callback(title);
+          let category = categoryDropdown.get_active_id();
+          if (title && category) {
+            callback(title, category);
+            this.close();
           }
-          this.close();
         },
       });
     }
@@ -140,35 +159,66 @@ const QuickNotesIndicator = GObject.registerClass(
     }
 
     _buildMenu() {
+      // Create a horizontal box for Add Note and Add Category
+      let topButtonBox = new St.BoxLayout({
+        style_class: "top-button-row",
+        vertical: false,
+        x_expand: true,
+      });
+
       // Add Note button with icon
-      let addNoteItem = new PopupMenu.PopupMenuItem("Add Note");
+      let addNoteItem = new St.Button({
+        style_class: "add-note-button",
+        x_expand: true,
+      });
       let addIcon = new St.Icon({
         icon_name: "document-new-symbolic",
         style_class: "popup-menu-icon",
       });
-      addNoteItem.insert_child_at_index(addIcon, 1);
-      addNoteItem.connect("activate", () => {
-        let dialog = new NewNoteDialog((title) => {
-          this._createNewNote(title);
-        });
+      let addNoteLabel = new St.Label({ text: "Add Note" });
+      addNoteItem.set_child(
+        new St.BoxLayout({ children: [addIcon, addNoteLabel], spacing: 6 })
+      );
+      addNoteItem.connect("clicked", () => {
+        let dialog = new NewNoteDialog((title, category) => {
+          this._createNewNote(title, category);
+        }, this._getCategoryList());
         dialog.open();
       });
-      this.menu.addMenuItem(addNoteItem);
+      topButtonBox.add_child(addNoteItem);
 
       // Add Category button
-      let addCategoryItem = new PopupMenu.PopupMenuItem("Add Category");
+      let addCategoryItem = new St.Button({
+        style_class: "add-category-button",
+        x_expand: true,
+      });
       let addCategoryIcon = new St.Icon({
         icon_name: "folder-new-symbolic",
         style_class: "popup-menu-icon",
       });
-      addCategoryItem.insert_child_at_index(addCategoryIcon, 1);
-      addCategoryItem.connect("activate", () => {
+      let addCategoryLabel = new St.Label({ text: "Add Category" });
+      addCategoryItem.set_child(
+        new St.BoxLayout({
+          children: [addCategoryIcon, addCategoryLabel],
+          spacing: 6,
+        })
+      );
+      addCategoryItem.connect("clicked", () => {
         let dialog = new NewFolderDialog((name) => {
           this._createNewCategory(name);
         });
         dialog.open();
       });
-      this.menu.addMenuItem(addCategoryItem);
+      topButtonBox.add_child(addCategoryItem);
+
+      this.menu.addMenuItem(
+        new PopupMenu.PopupBaseMenuItem({
+          reactive: false,
+          can_focus: false,
+          child: topButtonBox,
+          style_class: "top-button-row-menu-item",
+        })
+      );
 
       // Separator
       this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
@@ -325,13 +375,11 @@ const QuickNotesIndicator = GObject.registerClass(
       }
     }
 
-    _createNewNote(title) {
+    _createNewNote(title, category) {
       let safeTitle = title.replace(/ /g, "_");
-      let categoryPath =
-        this._selectedCategory === "all"
-          ? this._notesDir
-          : GLib.build_filenamev([this._categoriesDir, this._selectedCategory]);
-
+      let categoryPath = category
+        ? GLib.build_filenamev([this._categoriesDir, category])
+        : this._notesDir;
       let notePath = GLib.build_filenamev([categoryPath, `${safeTitle}.md`]);
       let file = Gio.File.new_for_path(notePath);
 
@@ -363,19 +411,15 @@ const QuickNotesIndicator = GObject.registerClass(
       this._notesSection.removeAll();
       this._noteItems = [];
 
-      let baseDir =
-        this._selectedCategory === "all"
-          ? this._notesDir
-          : GLib.build_filenamev([this._categoriesDir, this._selectedCategory]);
-
-      let dir = Gio.File.new_for_path(baseDir);
+      // 1. Afficher les notes hors catégorie
+      let dir = Gio.File.new_for_path(this._notesDir);
       let enumerator = dir.enumerate_children(
         "standard::*",
         Gio.FileQueryInfoFlags.NONE,
         null
       );
-
       let info;
+      let uncategorizedNotes = [];
       while ((info = enumerator.next_file(null))) {
         let filename = info.get_name();
         if (
@@ -383,16 +427,65 @@ const QuickNotesIndicator = GObject.registerClass(
           filename.endsWith(".md")
         ) {
           let title = this._getTitleFromFilename(filename);
+          uncategorizedNotes.push({ filename, title });
+        }
+      }
+      if (uncategorizedNotes.length > 0) {
+        let uncategorizedSection = new PopupMenu.PopupSubMenuMenuItem(
+          "Sans catégorie"
+        );
+        for (let note of uncategorizedNotes) {
           this._createNoteMenuItem(
-            this._notesSection,
-            filename,
-            title,
-            baseDir
+            uncategorizedSection.menu,
+            note.filename,
+            note.title,
+            this._notesDir
           );
+        }
+        this._notesSection.addMenuItem(uncategorizedSection);
+      }
+
+      // 2. Afficher les notes par catégorie
+      let catDir = Gio.File.new_for_path(this._categoriesDir);
+      let catEnum = catDir.enumerate_children(
+        "standard::*",
+        Gio.FileQueryInfoFlags.NONE,
+        null
+      );
+      let catInfo;
+      while ((catInfo = catEnum.next_file(null))) {
+        if (catInfo.get_file_type() === Gio.FileType.DIRECTORY) {
+          let catName = catInfo.get_name();
+          let displayName = catName.replace(/_/g, " ");
+          let categorySection = new PopupMenu.PopupSubMenuMenuItem(displayName);
+          let notesPath = GLib.build_filenamev([this._categoriesDir, catName]);
+          let notesDir = Gio.File.new_for_path(notesPath);
+          let notesEnum = notesDir.enumerate_children(
+            "standard::*",
+            Gio.FileQueryInfoFlags.NONE,
+            null
+          );
+          let noteInfo;
+          while ((noteInfo = notesEnum.next_file(null))) {
+            let filename = noteInfo.get_name();
+            if (
+              noteInfo.get_file_type() === Gio.FileType.REGULAR &&
+              filename.endsWith(".md")
+            ) {
+              let title = this._getTitleFromFilename(filename);
+              this._createNoteMenuItem(
+                categorySection.menu,
+                filename,
+                title,
+                notesPath
+              );
+            }
+          }
+          this._notesSection.addMenuItem(categorySection);
         }
       }
 
-      // Apply current search filter if any
+      // Appliquer le filtre de recherche si besoin
       if (this._searchEntry.get_text()) {
         this._filterNotes();
       }
@@ -423,6 +516,7 @@ const QuickNotesIndicator = GObject.registerClass(
         x_align: St.Align.END,
       });
 
+      // Edit button
       let editIcon = new St.Icon({
         icon_name: "document-edit-symbolic",
         style_class: "popup-menu-icon",
@@ -435,7 +529,23 @@ const QuickNotesIndicator = GObject.registerClass(
         this._editNote(filename, parentPath);
         this.menu.close();
       });
+      buttonBox.add_child(editButton);
 
+      // Move button
+      let moveIcon = new St.Icon({
+        icon_name: "go-jump-symbolic",
+        style_class: "popup-menu-icon",
+      });
+      let moveButton = new St.Button({
+        style_class: "button",
+        child: moveIcon,
+      });
+      moveButton.connect("clicked", () => {
+        this._showMoveNoteMenu(filename, parentPath, noteItem);
+      });
+      buttonBox.add_child(moveButton);
+
+      // Delete button
       let deleteIcon = new St.Icon({
         icon_name: "edit-delete-symbolic",
         style_class: "popup-menu-icon",
@@ -448,8 +558,6 @@ const QuickNotesIndicator = GObject.registerClass(
         this._deleteNote(filename, parentPath);
         this.menu.close();
       });
-
-      buttonBox.add_child(editButton);
       buttonBox.add_child(deleteButton);
       itemBox.add_child(buttonBox);
 
@@ -461,6 +569,48 @@ const QuickNotesIndicator = GObject.registerClass(
       });
 
       menu.addMenuItem(noteItem);
+    }
+
+    _showMoveNoteMenu(filename, parentPath, noteItem) {
+      // Crée un menu contextuel pour choisir la destination
+      let moveMenu = new PopupMenu.PopupSubMenuMenuItem("Déplacer vers...");
+      let categories = this._getCategoryList();
+      // Option Sans catégorie
+      let rootItem = new PopupMenu.PopupMenuItem("Sans catégorie");
+      rootItem.connect("activate", () => {
+        this._moveNoteToCategory(filename, parentPath, null);
+        moveMenu.destroy();
+      });
+      moveMenu.menu.addMenuItem(rootItem);
+      for (let cat of categories) {
+        let catItem = new PopupMenu.PopupMenuItem(cat.displayName);
+        catItem.connect("activate", () => {
+          this._moveNoteToCategory(filename, parentPath, cat.name);
+          moveMenu.destroy();
+        });
+        moveMenu.menu.addMenuItem(catItem);
+      }
+      // Affiche le menu juste après le noteItem
+      let parentMenu = noteItem._parent;
+      let idx = parentMenu._getMenuItems().indexOf(noteItem);
+      parentMenu.addMenuItem(moveMenu, idx + 1);
+      moveMenu.menu.open();
+    }
+
+    _moveNoteToCategory(filename, oldParentPath, newCategory) {
+      let oldPath = GLib.build_filenamev([oldParentPath, filename]);
+      let newParentPath = newCategory
+        ? GLib.build_filenamev([this._categoriesDir, newCategory])
+        : this._notesDir;
+      let newPath = GLib.build_filenamev([newParentPath, filename]);
+      let oldFile = Gio.File.new_for_path(oldPath);
+      let newFile = Gio.File.new_for_path(newPath);
+      try {
+        oldFile.move(newFile, Gio.FileCopyFlags.OVERWRITE, null, null);
+        this._refreshNotes();
+      } catch (e) {
+        log(`Error moving note: ${e.message}`);
+      }
     }
 
     _editNote(filename, parentPath) {
@@ -498,6 +648,25 @@ const QuickNotesIndicator = GObject.registerClass(
       // Remove .md extension and replace underscores with spaces
       let title = filename.slice(0, -3);
       return title.replace(/_/g, " ");
+    }
+
+    _getCategoryList() {
+      let categories = [];
+      let dir = Gio.File.new_for_path(this._categoriesDir);
+      let enumerator = dir.enumerate_children(
+        "standard::*",
+        Gio.FileQueryInfoFlags.NONE,
+        null
+      );
+      let info;
+      while ((info = enumerator.next_file(null))) {
+        if (info.get_file_type() === Gio.FileType.DIRECTORY) {
+          let name = info.get_name();
+          let displayName = name.replace(/_/g, " ");
+          categories.push({ name, displayName });
+        }
+      }
+      return categories;
     }
   }
 );
