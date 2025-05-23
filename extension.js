@@ -44,8 +44,8 @@ const NewNoteDialog = GObject.registerClass(
           let title = entry.get_text().trim();
           if (title) {
             callback(title);
+            this.close();
           }
-          this.close();
         },
       });
     }
@@ -96,6 +96,46 @@ const NewFolderDialog = GObject.registerClass(
 );
 
 /**
+ * Dialog for confirming note deletion
+ */
+const DeleteConfirmDialog = GObject.registerClass(
+  class DeleteConfirmDialog extends ModalDialog.ModalDialog {
+    _init(noteTitle, callback) {
+      super._init();
+
+      let content = new St.BoxLayout({
+        style_class: "note-dialog-content",
+        vertical: true,
+      });
+
+      let message = new St.Label({
+        text: `Êtes-vous sûr de vouloir supprimer la note "${noteTitle}" ?`,
+        style_class: "delete-confirm-message",
+      });
+      content.add_child(message);
+
+      this.contentLayout.add_child(content);
+
+      this.addButton({
+        label: "Annuler",
+        action: () => {
+          this.close();
+        },
+      });
+
+      this.addButton({
+        label: "Supprimer",
+        style_class: "destructive-action",
+        action: () => {
+          callback();
+          this.close();
+        },
+      });
+    }
+  }
+);
+
+/**
  * Main extension class that handles the panel indicator and note management
  */
 const QuickNotesIndicator = GObject.registerClass(
@@ -111,6 +151,9 @@ const QuickNotesIndicator = GObject.registerClass(
       hbox.add_child(icon);
       this.add_child(hbox);
 
+      // Initialize selected category
+      this._selectedCategory = "all";
+
       // Create notes directory
       this._notesDir = GLib.build_filenamev([
         GLib.get_home_dir(),
@@ -121,7 +164,18 @@ const QuickNotesIndicator = GObject.registerClass(
         dir.make_directory_with_parents(null);
       }
 
+      // Create categories directory
+      this._categoriesDir = GLib.build_filenamev([
+        this._notesDir,
+        "categories",
+      ]);
+      let categoriesDir = Gio.File.new_for_path(this._categoriesDir);
+      if (!categoriesDir.query_exists(null)) {
+        categoriesDir.make_directory_with_parents(null);
+      }
+
       this._buildMenu();
+      this._refreshCategories();
       this._refreshNotes();
     }
 
@@ -141,8 +195,62 @@ const QuickNotesIndicator = GObject.registerClass(
       });
       this.menu.addMenuItem(addNoteItem);
 
+      // Add Category button
+      let addCategoryItem = new PopupMenu.PopupMenuItem("Add Category");
+      let addCategoryIcon = new St.Icon({
+        icon_name: "folder-new-symbolic",
+        style_class: "popup-menu-icon",
+      });
+      addCategoryItem.insert_child_at_index(addCategoryIcon, 1);
+      addCategoryItem.connect("activate", () => {
+        let dialog = new NewFolderDialog((name) => {
+          this._createNewCategory(name);
+        });
+        dialog.open();
+      });
+      this.menu.addMenuItem(addCategoryItem);
+
       // Separator
       this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+      // Category filter
+      let categoryFilterItem = new PopupMenu.PopupBaseMenuItem({
+        reactive: false,
+        can_focus: false,
+        style_class: "category-filter-item",
+      });
+
+      let categoryBox = new St.BoxLayout({
+        style_class: "category-box",
+        x_expand: true,
+      });
+
+      let categoryIcon = new St.Icon({
+        icon_name: "folder-symbolic",
+        style_class: "popup-menu-icon",
+      });
+      categoryBox.add_child(categoryIcon);
+
+      this._categoryButton = new St.Button({
+        label: "All Categories",
+        style_class: "category-button",
+        x_expand: true,
+      });
+
+      this._categorySubMenu = new PopupMenu.PopupSubMenuMenuItem("", false);
+      this._categorySubMenu.actor.hide();
+      this._categorySubMenu.connect("activate", () => {
+        this._categorySubMenu.menu.toggle();
+      });
+
+      this._categoryButton.connect("clicked", () => {
+        this._categorySubMenu.menu.toggle();
+      });
+
+      categoryBox.add_child(this._categoryButton);
+      categoryFilterItem.add_child(categoryBox);
+      this.menu.addMenuItem(categoryFilterItem);
+      this.menu.addMenuItem(this._categorySubMenu);
 
       // Search entry with icon
       let searchItem = new PopupMenu.PopupBaseMenuItem({
@@ -206,12 +314,20 @@ const QuickNotesIndicator = GObject.registerClass(
       this.menu.addMenuItem(this._notesSection);
     }
 
-    _refreshNotes() {
+    _refreshCategories() {
       // Clear existing items
-      this._notesSection.removeAll();
-      this._noteItems = []; // Store note items for filtering
+      this._categorySubMenu.menu.removeAll();
 
-      let dir = Gio.File.new_for_path(this._notesDir);
+      // Add "All Categories" option
+      let allCategoriesItem = new PopupMenu.PopupMenuItem("All Categories");
+      allCategoriesItem.connect("activate", () => {
+        this._categoryButton.label = "All Categories";
+        this._selectedCategory = "all";
+        this._filterByCategory();
+      });
+      this._categorySubMenu.menu.addMenuItem(allCategoriesItem);
+
+      let dir = Gio.File.new_for_path(this._categoriesDir);
       let enumerator = dir.enumerate_children(
         "standard::*",
         Gio.FileQueryInfoFlags.NONE,
@@ -220,19 +336,146 @@ const QuickNotesIndicator = GObject.registerClass(
 
       let info;
       while ((info = enumerator.next_file(null))) {
+        if (info.get_file_type() === Gio.FileType.DIRECTORY) {
+          let name = info.get_name();
+          let displayName = name.replace(/_/g, " ");
+          let categoryItem = new PopupMenu.PopupMenuItem(displayName);
+          categoryItem.connect("activate", () => {
+            this._categoryButton.label = displayName;
+            this._selectedCategory = name;
+            this._filterByCategory();
+          });
+          this._categorySubMenu.menu.addMenuItem(categoryItem);
+        }
+      }
+    }
+
+    _createNewCategory(name) {
+      let safeName = name.replace(/ /g, "_");
+      let categoryPath = GLib.build_filenamev([this._categoriesDir, safeName]);
+      let dir = Gio.File.new_for_path(categoryPath);
+
+      try {
+        if (!dir.query_exists(null)) {
+          dir.make_directory_with_parents(null);
+          this._refreshCategories();
+        }
+      } catch (e) {
+        log(`Error creating category: ${e.message}`);
+      }
+    }
+
+    _createNewNote(title) {
+      let safeTitle = title.replace(/ /g, "_");
+      let notePath = GLib.build_filenamev([this._notesDir, `${safeTitle}.md`]);
+      let file = Gio.File.new_for_path(notePath);
+      try {
+        let stream = file.create(Gio.FileCreateFlags.NONE, null);
+        stream.write_all(`# ${title}\n\n`, null);
+        stream.close(null);
+        this._editNote(`${safeTitle}.md`, this._notesDir);
+        this._refreshNotes();
+      } catch (e) {
+        log(`Error creating note: ${e.message}`);
+      }
+    }
+
+    _filterByCategory() {
+      this._refreshNotes();
+    }
+
+    _filterNotes() {
+      let searchText = this._searchEntry
+        .get_text()
+        .toLowerCase()
+        .replace(/ /g, "_");
+      for (let noteItem of this._noteItems) {
+        noteItem.item.visible = noteItem.filename.includes(searchText);
+      }
+    }
+
+    _refreshNotes() {
+      // Clear existing items
+      this._notesSection.removeAll();
+      this._noteItems = [];
+
+      // 1. Afficher les notes hors catégorie
+      let dir = Gio.File.new_for_path(this._notesDir);
+      let enumerator = dir.enumerate_children(
+        "standard::*",
+        Gio.FileQueryInfoFlags.NONE,
+        null
+      );
+      let info;
+      let uncategorizedNotes = [];
+      while ((info = enumerator.next_file(null))) {
         let filename = info.get_name();
         if (
           info.get_file_type() === Gio.FileType.REGULAR &&
           filename.endsWith(".md")
         ) {
           let title = this._getTitleFromFilename(filename);
+          uncategorizedNotes.push({ filename, title });
+        }
+      }
+      if (uncategorizedNotes.length > 0) {
+        let uncategorizedSection = new PopupMenu.PopupSubMenuMenuItem(
+          "Sans catégorie"
+        );
+        for (let note of uncategorizedNotes) {
           this._createNoteMenuItem(
-            this._notesSection,
-            filename,
-            title,
+            uncategorizedSection.menu,
+            note.filename,
+            note.title,
             this._notesDir
           );
         }
+        this._notesSection.addMenuItem(uncategorizedSection);
+      }
+
+      // 2. Afficher les notes par catégorie
+      let catDir = Gio.File.new_for_path(this._categoriesDir);
+      let catEnum = catDir.enumerate_children(
+        "standard::*",
+        Gio.FileQueryInfoFlags.NONE,
+        null
+      );
+      let catInfo;
+      while ((catInfo = catEnum.next_file(null))) {
+        if (catInfo.get_file_type() === Gio.FileType.DIRECTORY) {
+          let catName = catInfo.get_name();
+          let displayName = catName.replace(/_/g, " ");
+          let categorySection = new PopupMenu.PopupSubMenuMenuItem(displayName);
+          let notesPath = GLib.build_filenamev([this._categoriesDir, catName]);
+          let notesDir = Gio.File.new_for_path(notesPath);
+          let notesEnum = notesDir.enumerate_children(
+            "standard::*",
+            Gio.FileQueryInfoFlags.NONE,
+            null
+          );
+          let noteInfo;
+          while ((noteInfo = notesEnum.next_file(null))) {
+            let filename = noteInfo.get_name();
+            if (
+              noteInfo.get_file_type() === Gio.FileType.REGULAR &&
+              filename.endsWith(".md")
+            ) {
+              let title = this._getTitleFromFilename(filename);
+              this._createNoteMenuItem(
+                categorySection.menu,
+                filename,
+                title,
+                notesPath
+              );
+            }
+          }
+          this._notesSection.addMenuItem(categorySection);
+        }
+      }
+
+      // Appliquer le filtre de recherche si besoin
+      if (this._searchEntry.get_text()) {
+        this._filterNotes();
       }
     }
 
@@ -261,6 +504,7 @@ const QuickNotesIndicator = GObject.registerClass(
         x_align: St.Align.END,
       });
 
+      // Edit button
       let editIcon = new St.Icon({
         icon_name: "document-edit-symbolic",
         style_class: "popup-menu-icon",
@@ -273,7 +517,9 @@ const QuickNotesIndicator = GObject.registerClass(
         this._editNote(filename, parentPath);
         this.menu.close();
       });
+      buttonBox.add_child(editButton);
 
+      // Delete button
       let deleteIcon = new St.Icon({
         icon_name: "edit-delete-symbolic",
         style_class: "popup-menu-icon",
@@ -283,11 +529,12 @@ const QuickNotesIndicator = GObject.registerClass(
         child: deleteIcon,
       });
       deleteButton.connect("clicked", () => {
-        this._deleteNote(filename, parentPath);
+        let dialog = new DeleteConfirmDialog(title, () => {
+          this._deleteNote(filename, parentPath);
+        });
+        dialog.open();
         this.menu.close();
       });
-
-      buttonBox.add_child(editButton);
       buttonBox.add_child(deleteButton);
       itemBox.add_child(buttonBox);
 
@@ -338,29 +585,23 @@ const QuickNotesIndicator = GObject.registerClass(
       return title.replace(/_/g, " ");
     }
 
-    _createNewNote(title) {
-      let safeTitle = title.replace(/ /g, "_"); // Replace spaces with underscores instead of encoding
-      let notePath = GLib.build_filenamev([this._notesDir, `${safeTitle}.md`]);
-      let file = Gio.File.new_for_path(notePath);
-
-      try {
-        let stream = file.create(Gio.FileCreateFlags.NONE, null);
-        stream.write_all(`# ${title}\n\n`, null);
-        stream.close(null);
-        this._editNote(`${safeTitle}.md`, this._notesDir);
-        this._refreshNotes();
-      } catch (e) {
-        log(`Error creating note: ${e.message}`);
+    _getCategoryList() {
+      let categories = [];
+      let dir = Gio.File.new_for_path(this._categoriesDir);
+      let enumerator = dir.enumerate_children(
+        "standard::*",
+        Gio.FileQueryInfoFlags.NONE,
+        null
+      );
+      let info;
+      while ((info = enumerator.next_file(null))) {
+        if (info.get_file_type() === Gio.FileType.DIRECTORY) {
+          let name = info.get_name();
+          let displayName = name.replace(/_/g, " ");
+          categories.push({ name, displayName });
+        }
       }
-    }
-
-    _filterNotes() {
-      let searchText = this._searchEntry.get_text().toLowerCase();
-
-      // Utiliser le tableau _noteItems qui contient les références aux éléments et leurs noms de fichiers
-      for (let noteItem of this._noteItems) {
-        noteItem.item.visible = noteItem.filename.includes(searchText);
-      }
+      return categories;
     }
   }
 );

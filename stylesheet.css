@@ -69,3 +69,32 @@
 .search-entry {
     width: 200px;
 }
+
+.category-filter-item {
+    padding: 4px 0;
+}
+
+.category-box {
+    spacing: 6px;
+    padding: 0 8px;
+}
+
+.category-button {
+    width: 200px;
+    padding: 4px 8px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(0, 0, 0, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+    text-align: left;
+}
+
+.category-button:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.category-button:active {
+    border-color: rgba(255, 255, 255, 0.3);
+    background-color: rgba(0, 0, 0, 0.2);
+}
