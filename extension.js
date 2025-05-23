@@ -96,6 +96,46 @@ const NewFolderDialog = GObject.registerClass(
 );
 
 /**
+ * Dialog for confirming note deletion
+ */
+const DeleteConfirmDialog = GObject.registerClass(
+  class DeleteConfirmDialog extends ModalDialog.ModalDialog {
+    _init(noteTitle, callback) {
+      super._init();
+
+      let content = new St.BoxLayout({
+        style_class: "note-dialog-content",
+        vertical: true,
+      });
+
+      let message = new St.Label({
+        text: `Êtes-vous sûr de vouloir supprimer la note "${noteTitle}" ?`,
+        style_class: "delete-confirm-message",
+      });
+      content.add_child(message);
+
+      this.contentLayout.add_child(content);
+
+      this.addButton({
+        label: "Annuler",
+        action: () => {
+          this.close();
+        },
+      });
+
+      this.addButton({
+        label: "Supprimer",
+        style_class: "destructive-action",
+        action: () => {
+          callback();
+          this.close();
+        },
+      });
+    }
+  }
+);
+
+/**
  * Main extension class that handles the panel indicator and note management
  */
 const QuickNotesIndicator = GObject.registerClass(
@@ -489,7 +529,10 @@ const QuickNotesIndicator = GObject.registerClass(
         child: deleteIcon,
       });
       deleteButton.connect("clicked", () => {
-        this._deleteNote(filename, parentPath);
+        let dialog = new DeleteConfirmDialog(title, () => {
+          this._deleteNote(filename, parentPath);
+        });
+        dialog.open();
         this.menu.close();
       });
       buttonBox.add_child(deleteButton);
