@@ -176,8 +176,7 @@ const QuickNotesIndicator = GObject.registerClass(
         style_class: "popup-menu-icon",
       });
       let addNoteLabel = new St.Label({ text: "Add Note" });
-      let addNoteBox = new St.BoxLayout();
-      addNoteBox.set_spacing(6);
+      let addNoteBox = new St.BoxLayout({ spacing: 6 });
       addNoteBox.add_child(addIcon);
       addNoteBox.add_child(addNoteLabel);
       addNoteItem.set_child(addNoteBox);
@@ -199,8 +198,7 @@ const QuickNotesIndicator = GObject.registerClass(
         style_class: "popup-menu-icon",
       });
       let addCategoryLabel = new St.Label({ text: "Add Category" });
-      let addCategoryBox = new St.BoxLayout();
-      addCategoryBox.set_spacing(6);
+      let addCategoryBox = new St.BoxLayout({ spacing: 6 });
       addCategoryBox.add_child(addCategoryIcon);
       addCategoryBox.add_child(addCategoryLabel);
       addCategoryItem.set_child(addCategoryBox);
