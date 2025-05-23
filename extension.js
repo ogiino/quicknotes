@@ -121,6 +121,16 @@ const QuickNotesIndicator = GObject.registerClass(
         dir.make_directory_with_parents(null);
       }
 
+      // Create categories directory
+      this._categoriesDir = GLib.build_filenamev([
+        this._notesDir,
+        "categories",
+      ]);
+      let categoriesDir = Gio.File.new_for_path(this._categoriesDir);
+      if (!categoriesDir.query_exists(null)) {
+        categoriesDir.make_directory_with_parents(null);
+      }
+
       this._buildMenu();
       this._refreshNotes();
     }
@@ -141,8 +151,53 @@ const QuickNotesIndicator = GObject.registerClass(
       });
       this.menu.addMenuItem(addNoteItem);
 
+      // Add Category button
+      let addCategoryItem = new PopupMenu.PopupMenuItem("Add Category");
+      let addCategoryIcon = new St.Icon({
+        icon_name: "folder-new-symbolic",
+        style_class: "popup-menu-icon",
+      });
+      addCategoryItem.insert_child_at_index(addCategoryIcon, 1);
+      addCategoryItem.connect("activate", () => {
+        let dialog = new NewFolderDialog((name) => {
+          this._createNewCategory(name);
+        });
+        dialog.open();
+      });
+      this.menu.addMenuItem(addCategoryItem);
+
       // Separator
       this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+      // Category filter
+      let categoryFilterItem = new PopupMenu.PopupBaseMenuItem({
+        reactive: false,
+        can_focus: false,
+        style_class: "category-filter-item",
+      });
+
+      let categoryBox = new St.BoxLayout({
+        style_class: "category-box",
+        x_expand: true,
+      });
+
+      let categoryIcon = new St.Icon({
+        icon_name: "folder-symbolic",
+        style_class: "popup-menu-icon",
+      });
+      categoryBox.add_child(categoryIcon);
+
+      this._categoryCombo = new St.ComboBox({
+        x_expand: true,
+        style_class: "category-combo",
+      });
+      this._categoryCombo.connect("changed", () => {
+        this._filterByCategory();
+      });
+
+      categoryBox.add_child(this._categoryCombo);
+      categoryFilterItem.add_child(categoryBox);
+      this.menu.addMenuItem(categoryFilterItem);
 
       // Search entry with icon
       let searchItem = new PopupMenu.PopupBaseMenuItem({
@@ -206,12 +261,85 @@ const QuickNotesIndicator = GObject.registerClass(
       this.menu.addMenuItem(this._notesSection);
     }
 
+    _createNewCategory(name) {
+      let safeName = name.replace(/ /g, "_");
+      let categoryPath = GLib.build_filenamev([this._categoriesDir, safeName]);
+      let dir = Gio.File.new_for_path(categoryPath);
+
+      try {
+        if (!dir.query_exists(null)) {
+          dir.make_directory_with_parents(null);
+          this._refreshCategories();
+        }
+      } catch (e) {
+        log(`Error creating category: ${e.message}`);
+      }
+    }
+
+    _refreshCategories() {
+      this._categoryCombo.remove_all();
+
+      // Add "All Categories" option
+      this._categoryCombo.add("All Categories", "all");
+
+      let dir = Gio.File.new_for_path(this._categoriesDir);
+      let enumerator = dir.enumerate_children(
+        "standard::*",
+        Gio.FileQueryInfoFlags.NONE,
+        null
+      );
+
+      let info;
+      while ((info = enumerator.next_file(null))) {
+        if (info.get_file_type() === Gio.FileType.DIRECTORY) {
+          let name = info.get_name();
+          let displayName = name.replace(/_/g, " ");
+          this._categoryCombo.add(displayName, name);
+        }
+      }
+
+      this._categoryCombo.set_selected(0);
+    }
+
+    _createNewNote(title) {
+      let safeTitle = title.replace(/ /g, "_");
+      let selectedCategory = this._categoryCombo.get_selected();
+      let categoryPath =
+        selectedCategory === "all"
+          ? this._notesDir
+          : GLib.build_filenamev([this._categoriesDir, selectedCategory]);
+
+      let notePath = GLib.build_filenamev([categoryPath, `${safeTitle}.md`]);
+      let file = Gio.File.new_for_path(notePath);
+
+      try {
+        let stream = file.create(Gio.FileCreateFlags.NONE, null);
+        stream.write_all(`# ${title}\n\n`, null);
+        stream.close(null);
+        this._editNote(`${safeTitle}.md`, categoryPath);
+        this._refreshNotes();
+      } catch (e) {
+        log(`Error creating note: ${e.message}`);
+      }
+    }
+
+    _filterByCategory() {
+      let selectedCategory = this._categoryCombo.get_selected();
+      this._refreshNotes();
+    }
+
     _refreshNotes() {
       // Clear existing items
       this._notesSection.removeAll();
-      this._noteItems = []; // Store note items for filtering
+      this._noteItems = [];
 
-      let dir = Gio.File.new_for_path(this._notesDir);
+      let selectedCategory = this._categoryCombo.get_selected();
+      let baseDir =
+        selectedCategory === "all"
+          ? this._notesDir
+          : GLib.build_filenamev([this._categoriesDir, selectedCategory]);
+
+      let dir = Gio.File.new_for_path(baseDir);
       let enumerator = dir.enumerate_children(
         "standard::*",
         Gio.FileQueryInfoFlags.NONE,
@@ -230,7 +358,7 @@ const QuickNotesIndicator = GObject.registerClass(
             this._notesSection,
             filename,
             title,
-            this._notesDir
+            baseDir
           );
         }
       }
@@ -336,31 +464,6 @@ const QuickNotesIndicator = GObject.registerClass(
       // Remove .md extension and replace underscores with spaces
       let title = filename.slice(0, -3);
       return title.replace(/_/g, " ");
-    }
-
-    _createNewNote(title) {
-      let safeTitle = title.replace(/ /g, "_"); // Replace spaces with underscores instead of encoding
-      let notePath = GLib.build_filenamev([this._notesDir, `${safeTitle}.md`]);
-      let file = Gio.File.new_for_path(notePath);
-
-      try {
-        let stream = file.create(Gio.FileCreateFlags.NONE, null);
-        stream.write_all(`# ${title}\n\n`, null);
-        stream.close(null);
-        this._editNote(`${safeTitle}.md`, this._notesDir);
-        this._refreshNotes();
-      } catch (e) {
-        log(`Error creating note: ${e.message}`);
-      }
-    }
-
-    _filterNotes() {
-      let searchText = this._searchEntry.get_text().toLowerCase();
-
-      // Utiliser le tableau _noteItems qui contient les références aux éléments et leurs noms de fichiers
-      for (let noteItem of this._noteItems) {
-        noteItem.item.visible = noteItem.filename.includes(searchText);
-      }
     }
   }
 );
