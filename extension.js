@@ -401,8 +401,10 @@ const QuickNotesIndicator = GObject.registerClass(
     }
 
     _filterNotes() {
-      let searchText = this._searchEntry.get_text().toLowerCase();
-
+      let searchText = this._searchEntry
+        .get_text()
+        .toLowerCase()
+        .replace(/ /g, "_");
       for (let noteItem of this._noteItems) {
         noteItem.item.visible = noteItem.filename.includes(searchText);
       }
